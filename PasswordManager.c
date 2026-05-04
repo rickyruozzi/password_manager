@@ -193,3 +193,5 @@ int pm_load_from_file(PasswordManager *pm, const char* path){
     fclose(F);
     return 0;
 }
+
+//TODO: PASSWORD ENCRYPTION, FILE ENCRYPTION, ERROR HANDLING, MEMORY MANAGEMENT, TESTING, DOCUMENTATION, SPECIAL CHARACTER PROBLEM WITH STRTOK
