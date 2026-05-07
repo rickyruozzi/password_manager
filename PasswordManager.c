@@ -360,4 +360,37 @@ char *calculate_digest(const char *password) {
     return pm_base64_encode(digest, 32);
 }
 
-//TODO: AES encryption variant, digest-based key control, JSON formatting.
+char* AES_encryption(const char* text, const char* key) {
+    AES_KEY enc_key;
+    AES_set_encrypt_key((const unsigned char*)key, 128, &enc_key);
+    size_t text_len = strlen(text);
+    size_t padded_len = ((text_len + AES_BLOCK_SIZE) / AES_BLOCK_SIZE) * AES_BLOCK_SIZE; //we use it for padding the plaintext to a multiple of AES block size
+    unsigned char *padded_text = calloc(1, padded_len);
+    if (!padded_text) return NULL;
+    memcpy(padded_text, text, text_len);
+    unsigned char *encrypted = malloc(padded_len);
+    if(!encrypted) {
+        free(padded_text);
+        return NULL;
+    }
+    for(size_t i=0; i<padded_len; i+=AES_BLOCK_SIZE){
+        AES_encrypt(padded_text + i, encrypted + i, &enc_key); //we are encrypting each block of the padded plaintext and storing in the encrypted buffer.
+    }
+    free(padded_text);
+    return (char*)encrypted;
+}
+
+char* AES_decryption(const char* cipher, const char* key){
+    AES_KEY dec_key;
+    AES_set_decrypt_key((const unsigned char*)key, 128, &dec_key);
+    size_t cipher_len = strlen(cipher);
+    unsigned char *decrypted = malloc(cipher_len);
+    if(!decrypted) return NULL;
+    for(size_t i=0; i<cipher_len; i+=AES_BLOCK_SIZE){
+        AES_decrypt((const unsigned char*)cipher + i, decrypted + i, &dec_key); //we are decrypting each block of the cipher and storing in the decrypted buffer.
+    }
+    free((void*)cipher); 
+    return (char*)decrypted;
+}
+
+//TODO: JSON formatting.

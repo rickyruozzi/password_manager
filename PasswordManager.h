@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <openssl/aes.h> 
 
 typedef struct PasswordEntry {
     char *id; 
@@ -55,5 +56,7 @@ int pm_save_to_file(const PasswordManager *pm, const char *path);
 int pm_load_from_file(PasswordManager *pm, const char *path);
 
 char* calculate_digest(const char* password);
+char* AES_encryption(const char* text, const char* key);
+char* AES_decryption(const char* cipher, const char* key);
 
 #endif
