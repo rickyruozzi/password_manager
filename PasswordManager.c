@@ -5,6 +5,7 @@ static char *g_encryption_key = NULL;
 
 static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
+//Base64 encoding
 static char *pm_base64_encode(const unsigned char *data, size_t len) {
     size_t out_len = 4 * ((len + 2) / 3);
     char *out = malloc(out_len + 1);
@@ -25,6 +26,7 @@ static char *pm_base64_encode(const unsigned char *data, size_t len) {
     return out;
 }
 
+//Base64 decoding
 static unsigned char *pm_base64_decode(const char *b64, size_t *out_len) {
     if (b64 == NULL || out_len == NULL) return NULL;
     size_t blen = strlen(b64);
