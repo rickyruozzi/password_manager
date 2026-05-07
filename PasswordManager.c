@@ -221,6 +221,17 @@ int pm_save_to_file(const PasswordManager *pm, const char *path){
         return -1;
     }
     const char *key = g_encryption_key ? g_encryption_key : PM_DEFAULT_KEY;
+    
+    /* Write digest header for key verification */
+    char *digest = calculate_digest(key);
+    if (digest == NULL) {
+        fclose(f);
+        return -1;
+    }
+    fprintf(f, "DIGEST:%s\n", digest);
+    free(digest);
+    
+    /* Write entries with encrypted passwords */
     for(int i=0; i<pm->count; i++){
         char *enc = pm_encrypt_password(pm->entries[i].password);
         if (enc == NULL) {
@@ -243,8 +254,35 @@ int pm_load_from_file(PasswordManager *pm, const char* path){
     if(F==NULL){
         return -1;
     }
+    const char *key = g_encryption_key ? g_encryption_key : PM_DEFAULT_KEY;
     char line[1024];
+    int first_line = 1;
     while(fgets(line, sizeof(line), F)){
+        /* Check digest on first line */
+        if (first_line) {
+            first_line = 0;
+            if (strncmp(line, "DIGEST:", 7) == 0) {
+                char *stored_digest = line + 7;
+                size_t dlen = strlen(stored_digest);
+                if (dlen > 0 && stored_digest[dlen - 1] == '\n') {
+                    stored_digest[dlen - 1] = '\0';
+                }
+                char *calc_digest = calculate_digest(key);
+                if (calc_digest == NULL) {
+                    fclose(F);
+                    return -1;
+                }
+                /* Compare digests */
+                int match = (strcmp(stored_digest, calc_digest) == 0) ? 1 : 0;
+                free(calc_digest);
+                if (!match) {
+                    fclose(F);
+                    return -1; /* key mismatch */
+                }
+                continue; 
+            }
+        }
+        
         PasswordEntry entry; 
         char *dec_password = NULL;
         char *token = strtok(line, ",");
@@ -308,6 +346,18 @@ char *pm_decrypt_password(const char *encrypted_password) {
     plain[decoded_len] = '\0';
     free(decoded);
     return plain;
+}
+
+/* Calculate XOR digest over 32 bytes*/
+char *calculate_digest(const char *password) {
+    if (password == NULL) return NULL;
+    unsigned char digest[32] = {0};
+    size_t plen = strlen(password);
+    /* XOR each byte of password into digest[i % 32] */
+    for (size_t i = 0; i < plen; ++i) {
+        digest[i % 32] ^= (unsigned char)password[i];
+    }
+    return pm_base64_encode(digest, 32);
 }
 
 //TODO: AES encryption variant, digest-based key control, JSON formatting.

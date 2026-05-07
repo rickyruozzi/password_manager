@@ -54,4 +54,6 @@ char *pm_decrypt_password(const char *encrypted_password);
 int pm_save_to_file(const PasswordManager *pm, const char *path);
 int pm_load_from_file(PasswordManager *pm, const char *path);
 
+char* calculate_digest(const char* password);
+
 #endif
