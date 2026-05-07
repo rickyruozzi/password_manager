@@ -310,4 +310,4 @@ char *pm_decrypt_password(const char *encrypted_password) {
     return plain;
 }
 
-//TODO: PASSWORD ENCRYPTION, FILE ENCRYPTION, ERROR HANDLING, MEMORY MANAGEMENT, TESTING, DOCUMENTATION, SPECIAL CHARACTER PROBLEM WITH STRTOK.
+//TODO: AES encryption variant, digest-based key control, JSON formatting.
