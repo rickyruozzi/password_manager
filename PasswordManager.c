@@ -1,5 +1,79 @@
 #include "PasswordManager.h"
 
+static const char PM_DEFAULT_KEY[] = "change_this_key";
+static char *g_encryption_key = NULL;
+
+static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static char *pm_base64_encode(const unsigned char *data, size_t len) {
+    size_t out_len = 4 * ((len + 2) / 3);
+    char *out = malloc(out_len + 1);
+    if (!out) return NULL;
+    size_t i = 0, j = 0;
+    while (i < len) {
+        unsigned a = data[i++];
+        unsigned b = (i < len) ? data[i++] : 0;
+        unsigned c = (i < len) ? data[i++] : 0;
+        unsigned triple = (a << 16) | (b << 8) | c;
+
+        out[j++] = b64_table[(triple >> 18) & 0x3F];
+        out[j++] = b64_table[(triple >> 12) & 0x3F];
+        out[j++] = (i - 1 <= len) ? b64_table[(triple >> 6) & 0x3F] : '=';
+        out[j++] = (i <= len) ? b64_table[triple & 0x3F] : '=';
+    }
+    out[out_len] = '\0';
+    return out;
+}
+
+static unsigned char *pm_base64_decode(const char *b64, size_t *out_len) {
+    if (b64 == NULL || out_len == NULL) return NULL;
+    size_t blen = strlen(b64);
+    if (blen % 4 != 0) return NULL;
+
+    static int rev[256];
+    static int rev_init = 0;
+    if (!rev_init) {
+        for (int i = 0; i < 256; ++i) rev[i] = -1;
+        for (int i = 0; i < 64; ++i) rev[(unsigned char)b64_table[i]] = i;
+        rev_init = 1;
+    }
+
+    size_t out_capacity = (blen / 4) * 3;
+    unsigned char *out = malloc(out_capacity);
+    if (!out) return NULL;
+
+    size_t i = 0, j = 0;
+    while (i < blen) {
+        int v[4];
+        for (int k = 0; k < 4; ++k) {
+            char ch = b64[i++];
+            if (ch == '=') v[k] = -2; else v[k] = rev[(unsigned char)ch];
+            if (v[k] == -1) { free(out); return NULL; }
+        }
+
+        unsigned triple = ((v[0] < 0 ? 0 : v[0]) << 18) | ((v[1] < 0 ? 0 : v[1]) << 12) | ((v[2] < 0 ? 0 : v[2]) << 6) | (v[3] < 0 ? 0 : v[3]);
+
+        out[j++] = (triple >> 16) & 0xFF;
+        if (v[2] != -2) out[j++] = (triple >> 8) & 0xFF;
+        if (v[3] != -2) out[j++] = triple & 0xFF;
+    }
+
+    *out_len = j;
+    return out;
+}
+
+int pm_set_encryption_key(const char *key) {
+    if (key == NULL) return -1;
+    free(g_encryption_key);
+    g_encryption_key = strdup(key);
+    return (g_encryption_key == NULL) ? -1 : 0;
+}
+
+void pm_clear_encryption_key(void) {
+    free(g_encryption_key);
+    g_encryption_key = NULL;
+}
+
 void pm_init(PasswordManager *pm) {
     pm->entries = NULL;
     pm->count = 0;
@@ -37,7 +111,7 @@ int pm_add_entry(PasswordManager *pm, const PasswordEntry *entry){
 }
 
 //updating entry by id
-int pm_update_entry(PasswordManager *pm, const passwordEntry *entry){
+int pm_update_entry(PasswordManager *pm, const PasswordEntry *entry){
     for(int i=0; i<pm->count; i++){
         if(strcmp(pm->entries[i].id, entry->id) == 0){
             pm->entries[i] = *entry;
@@ -95,10 +169,9 @@ PasswordEntry *pm_list_entries(const PasswordManager *pm, size_t *out_count){
 //searching entries by filter
 PasswordEntry *pm_search_entries(const PasswordManager *pm, const PasswordFilter *filter, size_t *out_count){
     size_t match_count = 0; 
-    PasswordEntry *matches = malloc(pm->count * sizeof(PasswordEntry)){
-        if(matches == NULL){
-            return NULL; 
-        }
+    PasswordEntry *matches = malloc(pm->count * sizeof(PasswordEntry)); 
+    if(matches == NULL){
+        return NULL; 
     }
     for(int i=0; i<pm->count; i++){
         int service_match = (filter->service == NULL) || (strcmp(pm->entries[i].service, filter->service) == 0);
@@ -145,11 +218,18 @@ int pm_save_to_file(const PasswordManager *pm, const char *path){
     if(f == NULL){
         return -1;
     }
+    const char *key = g_encryption_key ? g_encryption_key : PM_DEFAULT_KEY;
     for(int i=0; i<pm->count; i++){
+        char *enc = pm_encrypt_password(pm->entries[i].password);
+        if (enc == NULL) {
+            fclose(f);
+            return -1;
+        }
         fprintf(f, "%s,%s,%s,%s,%s,%s,%lu,%lu\n",
             pm->entries[i].id, pm->entries[i].service, pm->entries[i].username,
-            pm->entries[i].password, pm->entries[i].url, pm->entries[i].notes,
+            enc, pm->entries[i].url, pm->entries[i].notes,
             pm->entries[i].created_at, pm->entries[i].updated_at);
+        free(enc);
     }
     fclose(f);
     return 0;
@@ -164,6 +244,7 @@ int pm_load_from_file(PasswordManager *pm, const char* path){
     char line[1024];
     while(fgets(line, sizeof(line), F)){
         PasswordEntry entry; 
+        char *dec_password = NULL;
         char *token = strtok(line, ",");
         if(token == NULL) continue; 
         entry.id = strdup(token); //strdup allocates memory and copies the string
@@ -175,7 +256,10 @@ int pm_load_from_file(PasswordManager *pm, const char* path){
         entry.username = strdup(token);
         token = strtok(NULL, ",");
         if(token == NULL) continue;
-        entry.password = strdup(token);
+        /* token contains encrypted base64 password */
+        dec_password = pm_decrypt_password(token);
+        if (dec_password == NULL) dec_password = strdup("");
+        entry.password = dec_password;
         token = strtok(NULL, ",");
         if(token == NULL) continue;
         entry.url = strdup(token);
@@ -187,11 +271,41 @@ int pm_load_from_file(PasswordManager *pm, const char* path){
         entry.created_at = strtoul(token, NULL, 10); //strtoul converts string to unsigned long
         token = strtok(NULL, ",");
         if(token == NULL) continue;
-        entry.updated_at = strtoul(token, NULL, 10);
+        entry.updated_at = strtoul(token, NULL, 10); //strtoul converts string to unsigned long
         pm_add_entry(pm, &entry); //add the entry to the password manager
     }
     fclose(F);
     return 0;
+}
+
+/* Encrypts a plaintext password using XOR with the runtime key (or default) and returns HEX string (malloc'd) */
+char *pm_encrypt_password(const char *plain_password) {
+    if (plain_password == NULL) return NULL;
+    const char *key = g_encryption_key ? g_encryption_key : PM_DEFAULT_KEY;
+    size_t plen = strlen(plain_password);
+    size_t klen = strlen(key);
+    unsigned char *tmp = malloc(plen);
+    if (!tmp) return NULL;
+    for (size_t i = 0; i < plen; ++i) tmp[i] = (unsigned char)(plain_password[i] ^ key[i % klen]);
+    char *b64 = pm_base64_encode(tmp, plen);
+    free(tmp);
+    return b64;
+}
+
+/* Decrypts a HEX string produced by pm_encrypt_password and returns plaintext (malloc'd) */
+char *pm_decrypt_password(const char *encrypted_password) {
+    if (encrypted_password == NULL) return NULL;
+    const char *key = g_encryption_key ? g_encryption_key : PM_DEFAULT_KEY;
+    size_t decoded_len = 0;
+    unsigned char *decoded = pm_base64_decode(encrypted_password, &decoded_len);
+    if (!decoded) return NULL;
+    size_t klen = strlen(key);
+    char *plain = malloc(decoded_len + 1);
+    if (!plain) { free(decoded); return NULL; }
+    for (size_t i = 0; i < decoded_len; ++i) plain[i] = (char)(decoded[i] ^ key[i % klen]);
+    plain[decoded_len] = '\0';
+    free(decoded);
+    return plain;
 }
 
 //TODO: PASSWORD ENCRYPTION, FILE ENCRYPTION, ERROR HANDLING, MEMORY MANAGEMENT, TESTING, DOCUMENTATION, SPECIAL CHARACTER PROBLEM WITH STRTOK.

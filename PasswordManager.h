@@ -3,10 +3,9 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <vector>
-#include <string>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct PasswordEntry {
     char *id; 
@@ -46,10 +45,13 @@ PasswordEntry *pm_search_entries(const PasswordManager *pm, const PasswordFilter
 
 /* utilities */
 char *pm_generate_password(size_t length, int use_symbols);
+int pm_set_encryption_key(const char *key);
+void pm_clear_encryption_key(void);
+char *pm_encrypt_password(const char *plain_password);
+char *pm_decrypt_password(const char *encrypted_password);
 
 /* persistence */
 int pm_save_to_file(const PasswordManager *pm, const char *path);
 int pm_load_from_file(PasswordManager *pm, const char *path);
-
 
 #endif
