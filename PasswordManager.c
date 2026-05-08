@@ -449,4 +449,33 @@ PasswordEntry *pm_entry_init(void){
     entry->updated_at = 0;
     return entry;
 }
+
+int export_to_json(const PasswordManager *pm, const char *path){
+    File *f = fopen(path, "w");
+    if(f == NULL){
+        return -1;
+    }
+    fprintf(f, "{\n  \"entries\": [\n");
+    for(int i=0; i<pm->count; i++){
+        fprintf(f, "    {\n");
+        fprintf(f, "      \"id\": \"%s\",\n", pm->entries[i].id);
+        fprintf(f, "      \"service\": \"%s\",\n", pm->entries[i].service);
+        fprintf(f, "      \"username\": \"%s\",\n", pm->entries[i].username);
+        fprintf(f, "      \"password\": \"%s\",\n", pm->entries[i].password);
+        fprintf(f, "      \"url\": \"%s\",\n", pm->entries[i].url);
+        fprintf(f, "      \"notes\": \"%s\",\n", pm->entries[i].notes);
+        fprintf(f, "      \"category\": \"%s\",\n", pm->entries[i].category);
+        fprintf(f, "      \"created_at\": %lu,\n", pm->entries[i].created_at);
+        fprintf(f, "      \"updated_at\": %lu\n", pm->entries[i].updated_at);
+        if(i < pm->count - 1){
+            fprintf(f, "    },\n");
+        } else {
+            fprintf(f, "    }\n");
+        }
+    }
+    fprintf(f, "  ]\n}");
+    fclose(f);
+    return 0;
+}
+
 //TODO: JSON formatting.
