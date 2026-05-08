@@ -53,8 +53,11 @@ char *pm_encrypt_password(const char *plain_password);
 char *pm_decrypt_password(const char *encrypted_password);
 
 /* persistence */
-int pm_save_to_file(const PasswordManager *pm, const char *path);
-int pm_load_from_file(PasswordManager *pm, const char *path);
+int pm_save_to_file_csv(const PasswordManager *pm, const char *path);
+int pm_load_from_file_csv(PasswordManager *pm, const char *path);
+
+int pm_load_file(PasswordManager *pm, const char *path);
+int pm_save_file(const PasswordManager *pm, const char *path);
 
 char* calculate_digest(const char* password);
 char* AES_encryption(const char* text, const char* key);

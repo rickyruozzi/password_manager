@@ -217,7 +217,7 @@ char *pm_generate_password(size_t length, int use_symbols){
 }
 
 //saving entries to a file in csv format
-int pm_save_to_file(const PasswordManager *pm, const char *path){
+int pm_save_to_file_csv(const PasswordManager *pm, const char *path){
     FILE *f = fopen(path, "w");
     if(f == NULL){
         return -1;
@@ -250,8 +250,8 @@ int pm_save_to_file(const PasswordManager *pm, const char *path){
     return 0;
 }
 
-//loading entries from a file
-int pm_load_from_file(PasswordManager *pm, const char* path){
+//loading entries from a file in CSV format
+int pm_load_from_file_csv(PasswordManager *pm, const char* path){
     FILE *F = fopen(path, "r");
     if(F==NULL){
         return -1;
@@ -529,4 +529,19 @@ int import_from_json(PasswordManager *pm, const char *path){
     return 0;
 }
 
-//TODO: JSON formatting.
+
+// Load from file - automatically detects format by extension
+int pm_load_file(PasswordManager *pm, const char *path){
+    if (strstr(path, ".json") != NULL) {
+        return import_from_json(pm, path);
+    }
+    return pm_load_from_file_csv(pm, path);
+}
+
+// Save to file - automatically detects format by extension
+int pm_save_file(const PasswordManager *pm, const char *path){
+    if (strstr(path, ".json") != NULL) {
+        return export_to_json(pm, path);
+    }
+    return pm_save_to_file_csv(pm, path);
+}
