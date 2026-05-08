@@ -67,5 +67,6 @@ void category_filter(const PasswordManager *pm, const char* category, size_t *ou
 PasswordEntry *pm_entry_init(void);
 
 int export_to_json(const PasswordManager *pm, const char *path);
+int import_from_json(PasswordManager *pm, const char *path);
 
 #endif

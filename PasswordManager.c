@@ -451,7 +451,7 @@ PasswordEntry *pm_entry_init(void){
 }
 
 int export_to_json(const PasswordManager *pm, const char *path){
-    File *f = fopen(path, "w");
+    FILE *f = fopen(path, "w");
     if(f == NULL){
         return -1;
     }
@@ -474,6 +474,57 @@ int export_to_json(const PasswordManager *pm, const char *path){
         }
     }
     fprintf(f, "  ]\n}");
+    fclose(f);
+    return 0;
+}
+
+int import_from_json(PasswordManager *pm, const char *path){
+    FILE *f = fopen(path, "r");
+    if(f == NULL){
+        return -1;
+    }
+    char buffer[1024];
+    fgets(buffer, sizeof(buffer), f);
+    if(strncmp(buffer, "{", 1) != 0){
+        fclose(f);
+        return -1;
+    }
+    while(fgets(buffer, sizeof(buffer), f)){
+        if(strncmp(buffer, "}", 1) == 0){
+            break;
+        }
+        if(strstr(buffer, "\"id\":")){
+            PasswordEntry entry; 
+            char *token = strtok(buffer, "\"");
+            token = strtok(NULL, "\"");
+            entry.id = strdup(token);
+            token = strtok(NULL, "\"");
+            token = strtok(NULL, "\"");
+            entry.service = strdup(token);
+            token = strtok(NULL, "\"");
+            token = strtok(NULL, "\"");
+            entry.username = strdup(token);
+            token = strtok(NULL, "\"");
+            token = strtok(NULL, "\"");
+            entry.password = strdup(token);
+            token = strtok(NULL, "\"");
+            token = strtok(NULL, "\"");
+            entry.url = strdup(token);
+            token = strtok(NULL, "\"");
+            token = strtok(NULL, "\"");
+            entry.notes = strdup(token);
+            token = strtok(NULL, "\"");
+            token = strtok(NULL, "\"");
+            entry.category = strdup(token);
+            token = strtok(NULL, ":");
+            token = strtok(NULL, ",");
+            entry.created_at = strtoul(token, NULL, 10);
+            token = strtok(NULL, ":");
+            token = strtok(NULL, ",");
+            entry.updated_at = strtoul(token, NULL, 10);
+            pm_add_entry(pm, &entry);
+        }
+    }
     fclose(f);
     return 0;
 }
