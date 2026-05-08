@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <openssl/aes.h> 
 
 typedef struct PasswordEntry {
@@ -35,10 +34,6 @@ typedef struct PasswordManager {
 
 void pm_init(PasswordManager *pm);
 void pm_free(PasswordManager *pm);
-
-/* entry creation */
-PasswordEntry *pm_entry_init(void);
-void pm_entry_free(PasswordEntry *entry);
 
 /* credentials management */
 int pm_add_entry(PasswordManager *pm, const PasswordEntry *entry);
