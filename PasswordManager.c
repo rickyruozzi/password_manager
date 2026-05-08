@@ -90,6 +90,7 @@ void pm_free(PasswordManager *pm){
         free(pm->entries[i].password);
         free(pm->entries[i].url);
         free(pm->entries[i].notes);
+        free(pm->entries[i].category);
     }
     free(pm->entries);
     pm->entries = NULL;
@@ -133,6 +134,7 @@ int pm_remove_entry(PasswordManager *pm, const char *id){
             free(pm->entries[i].password);
             free(pm->entries[i].url);
             free(pm->entries[i].notes);
+            free(pm->entries[i].category);
             for(int j=i; j<pm->count-1; j++){
                 pm->entries[j] = pm->entries[j+1];
             }
@@ -393,4 +395,58 @@ char* AES_decryption(const char* cipher, const char* key){
     return (char*)decrypted;
 }
 
+char* password_valutation(const char* password){
+    size_t p_length = strlen(password);
+    int has_upper = 0, has_lower = 0, has_digit = 0, has_symbol = 0;
+    for(size_t i=0; i<p_length; i++){
+        if(password[i] >= 'A' && password[i]<='Z') has_upper=1;
+        else if(password[i] >= 'a' && password[i]<='z') has_lower=1;
+        else if(password[i] >= '0' && password[i]<='9') has_digit=1;
+        else has_symbol=1;
+    }
+
+    if(p_length >= 8 && has_upper && has_lower && has_digit && has_symbol) {
+        return "Strong";
+    } else {
+        return "Weak";
+    }
+}
+
+int check_password_reusage(const PasswordManager *pm, const char* password){
+    for(int i=0; i<pm->count; i++){
+        if(strcmp(pm->entries[i].password, password) == 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void category_filter(const PasswordManager *pm, const char* category, size_t *out_count){
+    size_t match_count = 0;
+    for(size_t i=0; i<pm->count; i++){
+        if(strcmp(pm->entries[i].category, category) == 0){
+            match_count++;
+            printf("ID: %s\nService: %s\nUsername: %s\nURL: %s\nCreated At: %lu\nUpdated At: %lu\n\n",
+                pm->entries[i].id, pm->entries[i].service, pm->entries[i].username,
+                pm->entries[i].url, pm->entries[i].created_at, pm->entries[i].updated_at);
+        }
+    }
+    *out_count = match_count;
+}
+
+
+PasswordEntry *pm_entry_init(void){
+    PasswordEntry *entry = malloc(sizeof(PasswordEntry));
+    if(entry == NULL) return NULL;
+    entry->id = NULL;
+    entry->service = NULL;
+    entry->username = NULL;
+    entry->password = NULL;
+    entry->url = NULL;
+    entry->notes = NULL;
+    entry->category = NULL;
+    entry->created_at = 0;
+    entry->updated_at = 0;
+    return entry;
+}
 //TODO: JSON formatting.
